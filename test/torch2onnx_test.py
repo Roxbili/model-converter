@@ -12,5 +12,5 @@ tmp_path = '/tmp/resnet18.pth'
 torch.save(model, tmp_path)
 
 # convert
-converter = Torch2onnxConverter(tmp_path, 'model.onnx', target_shape=(3,224,224))
+converter = Torch2onnxConverter(tmp_path, 'test/model.onnx', target_shape=(3,224,224))
 converter.convert()

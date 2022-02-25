@@ -65,3 +65,6 @@ Note that `target_shape` is different for Pytorch and Tensorflow.
 
 2. [torch2tflite example](test/torch2tflite_test.py) \
     <img src="./img/torch2tflite.png" height="700">
+
+## References
+- [PyTorch to TensorFlow Lite Converter](https://github.com/omerferhatt/torch2tflite)

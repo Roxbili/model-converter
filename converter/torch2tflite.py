@@ -31,10 +31,28 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
             target_shape: tuple = (224, 224, 3),
             seed: int = 10,
             normalize: bool = True,
+            op_fuse: bool = True,
             representative_dataset: np.ndarray = None
     ):
+        """Convert pytorch model to TFLite model.
+
+            Args:
+                torch_model_path: the path to load pytorch model.
+                tf_model_path: where to save tensorflow model,
+                        if None, save to /tmp/model_converter/tf_model.
+                sample_file_path: input path (e.g., ./cat.jpg), 
+                        if None, random data will be generated according to target_shape.
+                target_shape: input shape size.
+                seed: random seed number.
+                normalize: whether to normalize the input.
+                op_fuse: whether to fuse the operator when pytorch model is 
+                        converted to onnx model (e.g., Conv2D-BatchNorm -> Conv2D).
+                        Note that the operator will be fused when converted to tflite model.
+                representative_dataset: if given, the tensorflow model will be quantized, 
+                        and the representative data is used to calibrate quantization model.
+        """
         super().__init__(torch_model_path=torch_model_path, sample_file_path=sample_file_path, \
-                            target_shape=target_shape, seed=seed, normalize=normalize)
+                            target_shape=target_shape, seed=seed, normalize=normalize, op_fuse=op_fuse)
 
         self.tflite_model_path = tflite_model_save_path if tflite_model_save_path is not None \
                                     else os.path.join(self.tmpdir, 'model.lite') 

@@ -10,6 +10,7 @@ try:
 except:
     pass
 import torch
+from torch.onnx import TrainingMode
 import onnx
 from onnx import shape_inference
 
@@ -22,11 +23,28 @@ class Torch2onnxConverter:
             sample_file_path: Optional[str] = None,
             target_shape: tuple = (3, 224, 224),
             seed: int = 10,
-            normalize: bool = True
+            normalize: bool = True,
+            op_fuse: bool = True
     ):
+        """Convert pytorch model to onnx model
+
+            Args:
+                torch_model_path: the path to load pytorch model.
+                onnx_model_save_path: the path to save onnx model, 
+                        if None, save to /tmp/model_converter/model.onnx.
+                sample_file_path: input path (e.g., ./cat.jpg), 
+                        if None, random data will be generated according to target_shape.
+                target_shape: input shape size.
+                seed: random seed number.
+                normalize: whether to normalize the input.
+                op_fuse: whether to fuse the operator when pytorch model is 
+                        converted to onnx model (e.g., Conv2D-BatchNorm -> Conv2D).
+                        Note that the operator will be fused when converted to tflite model.
+        """
         self.torch_model_path = torch_model_path
         self.sample_file_path = sample_file_path
         self.target_shape = target_shape
+        self.op_fuse = op_fuse
 
         if onnx_model_save_path is None:
             self.tmpdir = '/tmp/model_converter/'
@@ -122,6 +140,7 @@ class Torch2onnxConverter:
             verbose=False,
             export_params=True,
             do_constant_folding=False,
+            training=TrainingMode.EVAL if self.op_fuse else TrainingMode.TRAINING,
             input_names=['input'],
             opset_version=11,
             output_names=['output'])
