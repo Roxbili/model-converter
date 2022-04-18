@@ -6,7 +6,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import sys
 import shutil
 import logging
-logging.getLogger().setLevel(logging.INFO) # 为了打印log需要添加的
+logging.getLogger(__name__).setLevel(logging.INFO) # 为了打印log需要添加的
 
 try:
     import cv2
@@ -129,6 +129,7 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         onnx.checker.check_model(onnx_model)
         tf_rep = prepare(onnx_model)
         tf_rep.export_graph(self.tf_model_path)
+        logging.info('Change onnx model tensorflow model')
 
     def tf2tflite(self) -> None:
         converter = tf.lite.TFLiteConverter.from_saved_model(self.tf_model_path)

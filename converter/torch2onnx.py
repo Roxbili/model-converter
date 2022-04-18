@@ -3,7 +3,7 @@ import os, sys
 import numpy as np
 import shutil
 import logging
-logging.getLogger().setLevel(logging.INFO) # 为了打印log需要添加的
+logging.getLogger(__name__).setLevel(logging.INFO) # 为了打印log需要添加的
 
 try:
     import cv2
