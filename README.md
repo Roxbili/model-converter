@@ -48,7 +48,14 @@ converter.convert()
 
 torch2tflite (int8)
 ```python
+import torch
 from converter import Torch2TFLiteConverter
+
+dataset = torch.rand(16,3,224,224, dtype=torch.float32)
+def representative_dataset():
+    for data in dataset:
+        data = data.unsqueeze(0) # (1,3,224,224)
+        yield [data]
 
 converter = Torch2TFLiteConverter(tmp_path, tflite_model_save_path='model_int8.lite', target_shape=(224,224,3),
                                     representative_dataset=representative_dataset)
