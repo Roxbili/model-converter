@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Generator, Union
 
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -30,9 +30,9 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
             sample_file_path: Optional[str] = None,
             target_shape: tuple = (224, 224, 3),
             seed: int = 10,
-            normalize: bool = True,
+            normalize: bool = False,
             op_fuse: bool = True,
-            representative_dataset: np.ndarray = None
+            representative_dataset: Generator = None
     ):
         """Convert pytorch model to TFLite model.
 
@@ -44,11 +44,12 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
                         if None, random data will be generated according to target_shape.
                 target_shape: input shape size.
                 seed: random seed number.
-                normalize: whether to normalize the input.
+                normalize: whether to normalize the sample_data.
                 op_fuse: whether to fuse the operator when pytorch model is 
                         converted to onnx model (e.g., Conv2D-BatchNorm -> Conv2D).
                         Note that the operator will be fused when converted to tflite model.
-                representative_dataset: if given, the tensorflow model will be quantized, 
+                representative_dataset: generator type, yield data in function.
+                        If given, the tensorflow model will be quantized, 
                         and the representative data is used to calibrate quantization model.
         """
         super().__init__(torch_model_path=torch_model_path, sample_file_path=sample_file_path, \
@@ -59,8 +60,6 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         self.tf_model_path = tf_model_path if tf_model_path is not None \
                                     else os.path.join(self.tmpdir, 'tf_model') 
         self.representative_dataset = representative_dataset
-        if normalize and representative_dataset is not None:
-            self.representative_dataset = representative_dataset / 255.
 
     def convert(self):
         self.torch2onnx()
@@ -125,11 +124,6 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         logging.info(f'TFLite interpreter successfully loaded from, {self.tflite_model_path}')
         return interpret
 
-    def representative_data_gen(self):
-        # for input_value in tf.data.Dataset.from_tensor_slices(self.representative_dataset).batch(1).take(500):
-        for input_value in tf.data.Dataset.from_tensor_slices(self.representative_dataset).batch(1):
-            yield [input_value]
-
     def onnx2tf(self) -> None:
         onnx_model = onnx.load(self.onnx_model_path)
         onnx.checker.check_model(onnx_model)
@@ -142,7 +136,7 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         if self.representative_dataset is not None:
             # quantization config
             converter.optimizations = [tf.lite.Optimize.DEFAULT]
-            converter.representative_dataset = self.representative_data_gen
+            converter.representative_dataset = self.representative_dataset
 
             # assert all operations support int8, or raise error
             converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8, tf.lite.OpsSet.SELECT_TF_OPS]

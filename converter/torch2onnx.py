@@ -36,7 +36,7 @@ class Torch2onnxConverter:
                         if None, random data will be generated according to target_shape.
                 target_shape: input shape size.
                 seed: random seed number.
-                normalize: whether to normalize the input.
+                normalize: whether to normalize the sample_data.
                 op_fuse: whether to fuse the operator when pytorch model is 
                         converted to onnx model (e.g., Conv2D-BatchNorm -> Conv2D).
                         Note that the operator will be fused when converted to tflite model.
