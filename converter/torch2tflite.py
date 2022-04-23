@@ -32,7 +32,8 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
             seed: int = 10,
             normalize: bool = False,
             op_fuse: bool = True,
-            representative_dataset: Generator = None
+            representative_dataset: Generator = None,
+            evaluate_loader = None
     ):
         """Convert pytorch model to TFLite model.
 
@@ -51,6 +52,8 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
                 representative_dataset: generator type, yield data in function.
                         If given, the tensorflow model will be quantized, 
                         and the representative data is used to calibrate quantization model.
+                        (nchw)
+                evaluate_loader: pytorch dataloader to evaluate the quantized tflite model, if None, the model will not be evaluated.
         """
         super().__init__(torch_model_path=torch_model_path, sample_file_path=sample_file_path, \
                             target_shape=target_shape, seed=seed, normalize=normalize, op_fuse=op_fuse)
@@ -60,6 +63,7 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         self.tf_model_path = tf_model_path if tf_model_path is not None \
                                     else os.path.join(self.tmpdir, 'tf_model') 
         self.representative_dataset = representative_dataset
+        self.evaluate_loader = evaluate_loader
 
     def convert(self):
         self.torch2onnx()
@@ -67,8 +71,11 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         self.onnx2tf()
         self.tf2tflite()
         torch_output = self.inference_torch()
-        tflite_output = self.inference_tflite(self.load_tflite())
+        interpreter = self.load_tflite()
+        tflite_output = self.inference_tflite(interpreter)
         self.calc_error(torch_output, tflite_output)
+        if self.evaluate_loader is not None:
+            self.evaluate(interpreter)
 
     def load_sample_input(
             self,
@@ -153,12 +160,12 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
             f.write(tflite_model)
         logging.info(f'Tflite model is saved to {self.tflite_model_path}')
 
-    def inference_tflite(self, tflite_model) -> np.ndarray:
-        input_details = tflite_model.get_input_details()
-        output_details = tflite_model.get_output_details()
-        tflite_model.set_tensor(input_details[0]['index'], self.sample_data['sample_data_np'])
-        tflite_model.invoke()
-        y_pred = tflite_model.get_tensor(output_details[0]['index'])
+    def inference_tflite(self, interpreter: tf.lite.Interpreter) -> np.ndarray:
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+        interpreter.set_tensor(input_details[0]['index'], self.sample_data['sample_data_np'])
+        interpreter.invoke()
+        y_pred = interpreter.get_tensor(output_details[0]['index'])
         return y_pred
 
     @staticmethod
@@ -166,6 +173,27 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         mse = ((result_torch - result_tflite) ** 2).mean(axis=None)
         mae = np.abs(result_torch - result_tflite).mean(axis=None)
         logging.info(f'MSE (Mean-Square-Error): {mse}\tMAE (Mean-Absolute-Error): {mae}')
+
+    def evaluate(self, interpreter: tf.lite.Interpreter):
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+
+        correct_num = 0
+        for index, (image, label) in enumerate(self.evaluate_loader):
+            if isinstance(image, torch.Tensor):
+                image = image.cpu().numpy()
+                label = label.cpu().numpy()
+            interpreter.set_tensor(input_details[0]['index'], image)
+            interpreter.invoke()
+            y_pred = interpreter.get_tensor(output_details[0]['index'])
+
+            if index % 100 == 0:
+                logging.info(f'inference: {index}/{len(self.evaluate_loader) * 1}')
+            if y_pred.argmax() == label[0]:
+                correct_num += 1
+
+        accuracy = correct_num / (len(self.evaluate_loader) * 1)    # 1为batch_size
+        logging.info(f'tflite int8 model accuracy: {accuracy}')
 
 
 if __name__ == '__main__':
