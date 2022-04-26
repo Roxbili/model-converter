@@ -5,8 +5,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import sys
 import shutil
-import logging
-logging.getLogger(__name__).setLevel(logging.INFO) # 为了打印log需要添加的
+from .logger import Logger
+_logger = Logger(__name__).get_logger()
 
 try:
     import cv2
@@ -108,19 +108,19 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
 
                 sample_data_np = np.transpose(img, (2, 0, 1))[np.newaxis, :, :, :]
                 sample_data_torch = torch.from_numpy(sample_data_np)
-                logging.info(f'Sample input successfully loaded from, {file_path}')
+                _logger.info(f'Sample input successfully loaded from, {file_path}')
 
             except Exception:
-                logging.error(f'Can not load sample input from, {file_path}')
+                _logger.error(f'Can not load sample input from, {file_path}')
                 sys.exit(-1)
 
         else:
-            logging.info(f'Sample input file path not specified, random data will be generated')
+            _logger.info(f'Sample input file path not specified, random data will be generated')
             np.random.seed(seed)
             data = np.random.random(target_shape).astype(np.float32)
             sample_data_np = np.transpose(data, (2, 0, 1))[np.newaxis, :, :, :]
             sample_data_torch = torch.from_numpy(sample_data_np)
-            logging.info(f'Sample input randomly generated')
+            _logger.info(f'Sample input randomly generated')
 
         return {'sample_data_np': sample_data_np, 'sample_data_torch': sample_data_torch}
 
@@ -128,7 +128,7 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
 
         interpret = tf.lite.Interpreter(self.tflite_model_path)
         interpret.allocate_tensors()
-        logging.info(f'TFLite interpreter successfully loaded from, {self.tflite_model_path}')
+        _logger.info(f'TFLite interpreter successfully loaded from, {self.tflite_model_path}')
         return interpret
 
     def onnx2tf(self) -> None:
@@ -136,7 +136,7 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         onnx.checker.check_model(onnx_model)
         tf_rep = prepare(onnx_model)
         tf_rep.export_graph(self.tf_model_path)
-        logging.info('Change onnx model tensorflow model')
+        _logger.info('Change onnx model tensorflow model')
 
     def tf2tflite(self) -> None:
         converter = tf.lite.TFLiteConverter.from_saved_model(self.tf_model_path)
@@ -158,7 +158,7 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         tflite_model = converter.convert()
         with open(self.tflite_model_path, 'wb') as f:
             f.write(tflite_model)
-        logging.info(f'Tflite model is saved to {self.tflite_model_path}')
+        _logger.info(f'Tflite model is saved to {self.tflite_model_path}')
 
     def inference_tflite(self, interpreter: tf.lite.Interpreter) -> np.ndarray:
         input_details = interpreter.get_input_details()
@@ -172,7 +172,7 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
     def calc_error(result_torch, result_tflite):
         mse = ((result_torch - result_tflite) ** 2).mean(axis=None)
         mae = np.abs(result_torch - result_tflite).mean(axis=None)
-        logging.info(f'MSE (Mean-Square-Error): {mse}\tMAE (Mean-Absolute-Error): {mae}')
+        _logger.info(f'MSE (Mean-Square-Error): {mse}\tMAE (Mean-Absolute-Error): {mae}')
 
     def evaluate(self, interpreter: tf.lite.Interpreter):
         input_details = interpreter.get_input_details()
@@ -188,12 +188,12 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
             y_pred = interpreter.get_tensor(output_details[0]['index'])
 
             if index % 100 == 0:
-                logging.info(f'inference: {index}/{len(self.evaluate_loader) * 1}')
+                _logger.info(f'inference: {index}/{len(self.evaluate_loader) * 1}')
             if y_pred.argmax() == label[0]:
                 correct_num += 1
 
         accuracy = correct_num / (len(self.evaluate_loader) * 1)    # 1为batch_size
-        logging.info(f'tflite int8 model accuracy: {accuracy}')
+        _logger.info(f'tflite int8 model accuracy: {accuracy}')
 
 
 if __name__ == '__main__':

@@ -2,8 +2,8 @@ from typing import Optional
 import os, sys
 import numpy as np
 import shutil
-import logging
-logging.getLogger(__name__).setLevel(logging.INFO) # 为了打印log需要添加的
+from .logger import Logger
+_logger = Logger(__name__).get_logger()
 
 try:
     import cv2
@@ -63,11 +63,11 @@ class Torch2onnxConverter:
         try:
             if os.path.exists(self.tmpdir) and os.path.isdir(self.tmpdir):
                 shutil.rmtree(self.tmpdir)
-                logging.info(f'Old temp directory removed')
+                _logger.info(f'Old temp directory removed')
             os.makedirs(self.tmpdir, exist_ok=True)
-            logging.info(f'Temp directory created at {self.tmpdir}')
+            _logger.info(f'Temp directory created at {self.tmpdir}')
         except Exception:
-            logging.error('Can not create temporary directory, exiting!')
+            _logger.error('Can not create temporary directory, exiting!')
             sys.exit(-1)
 
     def load_torch_model(self) -> torch.nn.Module:
@@ -75,13 +75,13 @@ class Torch2onnxConverter:
             if self.torch_model_path.endswith('.pth') or self.torch_model_path.endswith('.pt'):
                 model = torch.load(self.torch_model_path, map_location='cpu')
                 model = model.eval()
-                logging.info('PyTorch model successfully loaded and mapped to CPU')
+                _logger.info('PyTorch model successfully loaded and mapped to CPU')
                 return model
             else:
-                logging.error('Specified file path not compatible with torch2tflite, exiting!')
+                _logger.error('Specified file path not compatible with torch2tflite, exiting!')
                 sys.exit(-1)
         except Exception:
-            logging.error('Can not load PyTorch model. Please make sure'
+            _logger.error('Can not load PyTorch model. Please make sure'
                           'that model saved like `torch.save(model, PATH)`')
             sys.exit(-1)
 
@@ -116,19 +116,19 @@ class Torch2onnxConverter:
 
                 sample_data_np = img[np.newaxis, :, :, :]
                 sample_data_torch = torch.from_numpy(sample_data_np)
-                logging.info(f'Sample input successfully loaded from, {file_path}')
+                _logger.info(f'Sample input successfully loaded from, {file_path}')
 
             except Exception:
-                logging.error(f'Can not load sample input from, {file_path}')
+                _logger.error(f'Can not load sample input from, {file_path}')
                 sys.exit(-1)
 
         else:
-            logging.info(f'Sample input file path not specified, random data will be generated')
+            _logger.info(f'Sample input file path not specified, random data will be generated')
             np.random.seed(seed)
             data = np.random.random(target_shape).astype(np.float32)
             sample_data_np = data[np.newaxis, :, :, :]
             sample_data_torch = torch.from_numpy(sample_data_np)
-            logging.info(f'Sample input randomly generated')
+            _logger.info(f'Sample input randomly generated')
 
         return {'sample_data_np': sample_data_np, 'sample_data_torch': sample_data_torch}
 
@@ -142,9 +142,9 @@ class Torch2onnxConverter:
             do_constant_folding=False,
             training=TrainingMode.EVAL if self.op_fuse else TrainingMode.TRAINING,
             input_names=['input'],
-            opset_version=11,
+            opset_version=12,
             output_names=['output'])
-        logging.info(f'ONNX model is saved to {self.onnx_model_path}')
+        _logger.info(f'ONNX model is saved to {self.onnx_model_path}')
 
     def add_value_info_for_constants(self, model : onnx.ModelProto):
         """
@@ -216,7 +216,6 @@ class Torch2onnxConverter:
         # 调用API添加inference shape信息并保存模型
         inferred_onnx_model = shape_inference.infer_shapes(onnx_model)
         onnx.save(inferred_onnx_model, self.onnx_model_path)
-        logging.info(f'Onnx model is saved to {self.onnx_model_path}')
 
     def inference_torch(self) -> np.ndarray:
         y_pred = self.torch_model(self.sample_data['sample_data_torch'])
