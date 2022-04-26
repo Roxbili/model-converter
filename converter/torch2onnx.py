@@ -144,6 +144,7 @@ class Torch2onnxConverter:
             input_names=['input'],
             opset_version=11,
             output_names=['output'])
+        logging.info(f'ONNX model is saved to {self.onnx_model_path}')
 
     def add_value_info_for_constants(self, model : onnx.ModelProto):
         """
