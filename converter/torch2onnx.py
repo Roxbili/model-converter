@@ -74,7 +74,10 @@ class Torch2onnxConverter:
         try:
             if self.torch_model_path.endswith('.pth') or self.torch_model_path.endswith('.pt'):
                 model = torch.load(self.torch_model_path, map_location='cpu')
-                model = model.eval()
+                if self.op_fuse:
+                    model.eval()
+                else:
+                    model.train()
                 _logger.info('PyTorch model successfully loaded and mapped to CPU')
                 return model
             else:
