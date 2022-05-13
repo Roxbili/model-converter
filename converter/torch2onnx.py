@@ -83,9 +83,8 @@ class Torch2onnxConverter:
             else:
                 _logger.error('Specified file path not compatible with torch2tflite, exiting!')
                 sys.exit(-1)
-        except Exception:
-            _logger.error('Can not load PyTorch model. Please make sure'
-                          'that model saved like `torch.save(model, PATH)`')
+        except Exception as e:
+            _logger.error(e)
             sys.exit(-1)
 
     def load_sample_input(

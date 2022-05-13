@@ -179,20 +179,24 @@ class Torch2TFLiteConverter(Torch2onnxConverter):
         output_details = interpreter.get_output_details()
 
         correct_num = 0
-        for index, (image, label) in enumerate(self.evaluate_loader):
-            if isinstance(image, torch.Tensor):
-                image = image.cpu().numpy()
-                label = label.cpu().numpy()
-            interpreter.set_tensor(input_details[0]['index'], image)
-            interpreter.invoke()
-            y_pred = interpreter.get_tensor(output_details[0]['index'])
+        for batch_index, (images, labels) in enumerate(self.evaluate_loader):
+            for i, (image, label) in enumerate(zip(images, labels)):
+                index = batch_index * self.evaluate_loader.batch_size + i
+                image = image.unsqueeze(0)
+                label = label.unsqueeze(0)
+                if isinstance(image, torch.Tensor):
+                    image = image.cpu().numpy()
+                    label = label.cpu().numpy()
+                interpreter.set_tensor(input_details[0]['index'], image)
+                interpreter.invoke()
+                y_pred = interpreter.get_tensor(output_details[0]['index'])
 
-            if index % 100 == 0:
-                _logger.info(f'inference: {index}/{len(self.evaluate_loader) * 1}')
-            if y_pred.argmax() == label[0]:
-                correct_num += 1
+                if index % 100 == 0:
+                    _logger.info(f'inference: {index}/{len(self.evaluate_loader.dataset)}')
+                if y_pred.argmax() == label[0]:
+                    correct_num += 1
 
-        accuracy = correct_num / (len(self.evaluate_loader) * 1)    # 1为batch_size
+        accuracy = correct_num / (len(self.evaluate_loader.dataset))    # 1为batch_size
         _logger.info(f'tflite int8 model accuracy: {accuracy}')
 
 
