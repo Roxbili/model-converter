@@ -22,7 +22,10 @@ setuptools.setup(
     install_requires=[
         "torch",
         "onnx",
-        "numpy"
+        "numpy",
+        "tensorflow==2.8.0",
+        "tensorflow-addons==0.16.1",
+        "tensorflow-probability==0.16.0"
     ],
   # python版本
     python_requires=">=3",
